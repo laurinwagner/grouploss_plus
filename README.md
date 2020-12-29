@@ -1,7 +1,7 @@
 
 # About
 
-This repository contains a PyTorch implementation of the extensions for The Grouploss for Deep Metric Learning https://arxiv.org/abs/1912.00385 that I developed in my [Master Thesis](https://drive.google.com/file/d/1kn1Lo-syhMLUbAzcnwQYgBwy9kxu_BYj/view?usp=sharing)
+This repository contains a PyTorch implementation of the extensions for [The Group Loss for Deep Metric Learning](https://arxiv.org/abs/1912.00385) that I developed in my [Master Thesis](https://drive.google.com/file/d/1kn1Lo-syhMLUbAzcnwQYgBwy9kxu_BYj/view?usp=sharing)
 
 
 
