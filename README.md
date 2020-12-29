@@ -13,7 +13,7 @@ We also support half-precision training via Nvidia Apex.
 
 # Reproducing Results
 
-Extending the paperwe not support training in 4 datasets: CUB-200-2011, CARS 196, Stanford Online Products and In-shop Clothes Retrieval. Simply provide the path to the dataset in train.py and declare what dataset you want to use for the training. Training on some other dataset should be straightforwars as long as you structure the dataset in the same way as those four datasets.
+Extending the paper we support training in 4 datasets: CUB-200-2011, CARS 196, Stanford Online Products and In-shop Clothes Retrieval. Simply provide the path to the dataset in train.py and declare what dataset you want to use for the training. Training on some other dataset should be straightforwars as long as you structure the dataset in the same way as those four datasets.
 
 The majority of experiments are done in inception with batch normalization. We provide support for the entire family of resnet and densenets. Simply define the type of the network you want to use in train.py.
 
