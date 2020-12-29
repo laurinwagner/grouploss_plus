@@ -1,3 +1,4 @@
+import torch.nn.functional as F
 import torch
 import torch.nn as nn
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
@@ -150,6 +151,10 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
+        self.Lambda=.5
+        self.Beta=.004
+        self.Leak=.5
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -204,8 +209,16 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        fc7 = torch.flatten(x, 1)
+        if(self.training):
+            x = self.avgpool(x)
+            fc7 = torch.flatten(x, 1)
+        else:
+            x_avg = self.avgpool(x)  
+            #x_max=self.maxpool(x)
+            #x=self.Lambda*x_max+(1-self.Lambda)*x_avg
+            fc7 = torch.flatten(x, 1)
+            fc7 = F.normalize(fc7,p=2,dim=1)+self.Beta*fc7
+
         x = self.fc(fc7)
 
         return x, fc7
@@ -335,4 +348,3 @@ def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
     kwargs['width_per_group'] = 64 * 2
     return _resnet('wide_resnet101_2', Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, **kwargs)
-

@@ -105,6 +105,9 @@ class DenseNet(nn.Module):
 
         # Linear layer
         self.classifier = nn.Linear(num_features, num_classes)
+        self.Lambda=.5
+        self.Beta=.005
+        self.Leak=0
 
         # Official init from torch repo.
         for m in self.modules():
@@ -118,10 +121,18 @@ class DenseNet(nn.Module):
 
     def forward(self, x):
         features = self.features(x)
-        out = F.relu(features, inplace=True)
-        fc7 = F.adaptive_avg_pool2d(out, (1, 1)).view(features.size(0), -1)
-        out = self.classifier(fc7)
-        return out, fc7
+        if(self.training):
+            out = F.relu(features, inplace=True)
+            fc7_final = F.adaptive_avg_pool2d(out, (1, 1)).view(features.size(0), -1)
+            out = self.classifier(fc7_final)
+        else:
+            out = F.leaky_relu(features,negative_slope=self.leak)
+            fc7_avg = F.adaptive_avg_pool2d(out, (1, 1)).view(features.size(0), -1)
+            fc7_max = F.adaptive_max_pool2d(out, (1, 1)).view(features.size(0), -1)
+            fc7_combine=self.Lambda*fc7_max+(1-self.Lambda)*fc7_avg
+            fc7_combine_norm=F.normalize(fc7_combine,p=2,dim=1)
+            fc7_final=self.Beta*fc7_combine+fc7_combine_norm
+        return out, fc7_final
 
 
 def _load_state_dict(model, model_url, progress):
@@ -186,7 +197,6 @@ def densenet169(pretrained=False, progress=True, **kwargs):
     """
     return _densenet('densenet169', 32, (6, 12, 32, 32), 64, pretrained, progress,
                      **kwargs)
-
 
 
 def densenet201(pretrained=False, progress=True, **kwargs):

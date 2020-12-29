@@ -9,7 +9,7 @@ def load_net(dataset, net_type, nb_classes, embed=False, sz_embedding=512):
     if net_type == 'bn_inception':
         model = net.bn_inception(pretrained=True)
         model.last_linear = nn.Linear(1024, nb_classes)
-        model.load_state_dict(torch.load('net/finetuned_' + dataset + '_' + net_type + '.pth'))
+        #model.load_state_dict(torch.load('net/finetuned_' + dataset + '_' + net_type + '.pth'))
 
         if embed:
             model = net.Inception_embed(model, 1024, sz_embedding, num_classes=nb_classes)

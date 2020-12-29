@@ -1,5 +1,7 @@
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 __all__ = ['BNInception', 'bn_inception']
 
@@ -13,7 +15,7 @@ https://github.com/dichotomies/proxy-nca.
 def bn_inception(pretrained=False, **kwargs):
     model = BNInception(**kwargs)
     if pretrained:
-        model.load_state_dict(torch.load('net/bn_inception_weights_pt04.pt'))
+        model.load_state_dict(torch.load('net/bn_inception_weights_pt04.pt'),strict=False)
     return model
 
 class BNInception(nn.Module):
@@ -547,7 +549,20 @@ class BNInception(nn.Module):
         self.global_pool = nn.AvgPool2d (
             7, stride=1, padding=0, ceil_mode=True, count_include_pad=True
         )
+        self.max_pool = nn.MaxPool2d (
+            7, stride=1, padding=0, ceil_mode=True
+        )
+        self.max_pool_2 = nn.MaxPool2d (
+            3, stride=2, padding=0, ceil_mode=True
+        )
+        self.global_pool_2 = nn.AvgPool2d (
+            3, stride=1, padding=0, ceil_mode=True, count_include_pad=True
+        )
         self.last_linear = nn.Linear(1024, nb_classes)
+        self.Lambda=0
+        self.Beta=0
+        self.Leak=0
+
 
     def features(self, input):
         conv1_7x7_s2_out = self.conv1_7x7_s2(input)
@@ -1213,7 +1228,8 @@ class BNInception(nn.Module):
         inception_5b_1x1_bn_out = self.inception_5b_1x1_bn(
             inception_5b_1x1_out
         )
-        inception_5b_relu_1x1_out = self.inception_5b_relu_1x1(
+        if(self.training):
+          inception_5b_relu_1x1_out = self.inception_5b_relu_1x1(
             inception_5b_1x1_bn_out
         )
         inception_5b_3x3_reduce_out = self.inception_5b_3x3_reduce(
@@ -1231,7 +1247,8 @@ class BNInception(nn.Module):
         inception_5b_3x3_bn_out = self.inception_5b_3x3_bn(
             inception_5b_3x3_out
         )
-        inception_5b_relu_3x3_out = self.inception_5b_relu_3x3(
+        if(self.training):
+          inception_5b_relu_3x3_out = self.inception_5b_relu_3x3(
             inception_5b_3x3_bn_out
         )
         inception_5b_double_3x3_reduce_out = \
@@ -1262,7 +1279,8 @@ class BNInception(nn.Module):
         inception_5b_double_3x3_2_bn_out = self.inception_5b_double_3x3_2_bn(
             inception_5b_double_3x3_2_out
         )
-        inception_5b_relu_double_3x3_2_out = \
+        if(self.training):
+          inception_5b_relu_double_3x3_2_out = \
                 self.inception_5b_relu_double_3x3_2(
                     inception_5b_double_3x3_2_bn_out
                 )
@@ -1275,10 +1293,12 @@ class BNInception(nn.Module):
         inception_5b_pool_proj_bn_out = self.inception_5b_pool_proj_bn(
             inception_5b_pool_proj_out
         )
-        inception_5b_relu_pool_proj_out = self.inception_5b_relu_pool_proj(
-            inception_5b_pool_proj_bn_out
-        )
-        inception_5b_output_out = torch.cat(
+        if(self.training):
+          inception_5b_relu_pool_proj_out = self.inception_5b_relu_pool_proj(
+                inception_5b_pool_proj_bn_out
+            )
+        if(self.training):
+          inception_5b_output_out = torch.cat(
             [
                 inception_5b_1x1_bn_out,
                 inception_5b_3x3_bn_out,
@@ -1286,35 +1306,39 @@ class BNInception(nn.Module):
                 inception_5b_pool_proj_bn_out
             ], 
             1
-        )
+          )
+        else:
+          inception_5b_output_out = torch.cat(
+            [
+                F.leaky_relu(inception_5b_1x1_bn_out,self.Leak),
+                F.leaky_relu(inception_5b_3x3_bn_out,self.Leak),
+                F.leaky_relu(inception_5b_double_3x3_2_bn_out,self.Leak),
+                F.leaky_relu(inception_5b_pool_proj_bn_out,self.Leak)
+            ], 
+            1
+          )
+
         return inception_5b_output_out
         # return inception_5b_output_out, inception_4e_output_out, inception_3c_output_out
 
     def logits(self, features):
-        x = self.global_pool(features)
-        fc7 = x.view(x.size(0), -1)
-        x = self.last_linear(fc7)
-        return x, fc7
+        if(self.training):
+          x = self.global_pool(features)
+          fc7_final = x.view(x.size(0), -1)
+
+        else:
+          x = self.Lambda*self.max_pool(features)+(1-self.Lambda)*self.global_pool(features)
+          fc7_final = x.view(x.size(0), -1)
+          fc7_final = F.normalize(fc7_final, p=2,dim =1)+self.Beta*fc7_final
+        x = self.last_linear(fc7_final)
+        return x, fc7_final
 
     def forward(self, input):
         x_h = self.features(input)
         x_h, fc7_h = self.logits(x_h)
 
+
         return x_h, fc7_h
-
-
-# class Inception_embed(nn.Module):
-#     def __init__(self, inception, inception_features_size, embed_features_size, num_classes):
-#         nn.Module.__init__(self)
-#         self.inception = inception
-#         self.embed = nn.Linear(inception_features_size, embed_features_size)
-#         self.fc = nn.Linear(embed_features_size, num_classes)
-#
-#     def forward(self, input):
-#         x, fc7 = self.inception(input)
-#         embedding_features = self.embed(fc7)
-#         x = self.fc(embedding_features)
-#         return x, embedding_features
 
 class Inception_embed(nn.Module):
     def __init__(self, inception, inception_features_size, embed_features_size, num_classes):
@@ -1327,7 +1351,6 @@ class Inception_embed(nn.Module):
         x, fc7 = self.inception(input)
         embedding_features = self.embed(fc7)
         x = self.fc(embedding_features)
+        if(not self.training):
+          embedding_features=F.normalize(embedding_features, p=2,dim =1)
         return x, embedding_features
-
-
-

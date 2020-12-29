@@ -1,3 +1,4 @@
+
 import torch
 import warnings
 
@@ -51,7 +52,7 @@ def _replicator(W, X, tol, max_iter):
         X = X * torch.matmul(W, X)
         # z = X.register_hook(lambda g: print(g))
         # print(z)
-        X /= X.sum(dim=X.dim() - 1).unsqueeze(X.dim() - 1)
+        X /= X.sum(dim=X.dim() - 1).unsqueeze(X.dim() - 1)+1e-12 # dirty fix for division of zero error creating Nan
         # z = X.register_hook(lambda g: print(g))
         # print(z)
 
